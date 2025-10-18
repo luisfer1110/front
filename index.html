@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Chatbot Cyberpunk</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Orbitron:wght@400;700&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <script src="https://js.pusher.com/8.4.0/pusher.min.js"></script>
+  <style>
+    :root {
+      --bg0: #070a14; --bg1: #0a0f1f; --panel: rgba(12,16,28,0.65);
+      --text: #E6F1FF; --muted: #9fb0c1;
+      --cyan: #00eaff; --magenta: #ff00d5; --purple:#8a2be2; --blue:#00a7e1;
+      --border: #1a2440; --line: rgba(121,162,255,0.08);
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body { margin: 0; color: var(--text);
+      background: radial-gradient(1200px 600px at 20% 0%, #0b1530 0%, var(--bg1) 35%, var(--bg0) 100%);
+      font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif;
+      letter-spacing: .2px;
+    }
+    /* Fondo con líneas de scan y glow sutil */
+    .bg-decor { position: fixed; inset: 0; pointer-events: none; z-index: 0; opacity: .9;
+      background:
+        radial-gradient(800px 300px at 80% 10%, rgba(255,0,213,0.08), transparent 65%),
+        radial-gradient(600px 400px at 15% 80%, rgba(0,234,255,0.10), transparent 70%),
+        repeating-linear-gradient(0deg, transparent 0 26px, var(--line) 26px 27px);
+    }
+
+    header { padding: 16px 20px; border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 5; background: linear-gradient(180deg, rgba(6,10,18,0.85), rgba(6,10,18,0.55)); backdrop-filter: blur(8px) saturate(140%); }
+    .neon-title { margin: 0; font-family: 'Press Start 2P', monospace; font-size: 16px; letter-spacing: 2px; color: #b7f7ff; text-shadow: 0 0 6px var(--cyan), 0 0 14px var(--cyan), 0 0 24px var(--purple); }
+    .status { margin-top: 6px; font-size: 12px; color: var(--muted); text-shadow: 0 0 8px rgba(0,234,255,0.2); }
+
+    .container { max-width: 980px; margin: 0 auto; padding: 18px; position: relative; z-index: 1; }
+    .chat { background: linear-gradient(180deg, rgba(20,26,38,.65), rgba(9,13,24,.45));
+      border: 1px solid var(--border); border-radius: 16px; overflow: hidden; display: grid; grid-template-rows: 1fr auto; height: calc(100vh - 180px);
+      box-shadow: 0 0 28px rgba(0,234,255,0.08), inset 0 0 40px rgba(121, 162, 255, 0.05);
+    }
+
+    #messages { padding: 18px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; background-image:
+      linear-gradient(180deg, rgba(121,162,255,0.04), rgba(121,162,255,0));
+    }
+    .msg { display: flex; gap: 10px; align-items: flex-start; }
+    .sender { font-family: 'Press Start 2P', monospace; font-size: 10px; color: #7bd9e6; margin: 0 6px; opacity: .85; }
+
+    .bubble { position: relative; padding: 12px 14px; border-radius: 14px; max-width: 74%; white-space: pre-wrap; word-wrap: break-word; backdrop-filter: blur(2px);
+      transition: transform .35s cubic-bezier(.25,.8,.25,1), opacity .35s; opacity: 0; transform: translateY(10px) scale(.98);
+    }
+    .bubble.appear { opacity: 1; transform: translateY(0) scale(1); }
+    .bubble::before { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+      background: linear-gradient(120deg, rgba(255,255,255,.0) 30%, rgba(255,255,255,.06) 47%, rgba(255,255,255,.0) 64%);
+      transform: translateX(-120%);
+      animation: sheen 1.2s ease forwards;
+    }
+    @keyframes sheen { to { transform: translateX(120%); } }
+
+    .from-user .bubble { background:
+      linear-gradient(140deg, rgba(0,234,255,.18), rgba(0,160,255,.08));
+      border: 1px solid rgba(0,234,255,.65);
+      box-shadow: 0 0 10px rgba(0,234,255,.45), 0 0 26px rgba(0,234,255,.18), inset 0 0 20px rgba(0,234,255,.08);
+      color: #07161d;
+    }
+    .from-bot .bubble { background:
+      linear-gradient(140deg, rgba(255,0,213,.22), rgba(138,43,226,.12));
+      border: 1px solid rgba(255,0,213,.6);
+      box-shadow: 0 0 10px rgba(255,0,213,.45), 0 0 26px rgba(138,43,226,.25), inset 0 0 20px rgba(255,0,213,.08);
+      color: #e9dff8;
+    }
+
+    form { display: grid; grid-template-columns: 1fr auto; gap: 10px; padding: 12px; border-top: 1px solid var(--border); background: linear-gradient(180deg, rgba(9,14,24,.7), rgba(9,14,24,.45)); }
+    input[type="text"] { width: 100%; padding: 14px 12px; border-radius: 12px; border: 1px solid #183045; background: #091222; color: var(--text);
+      box-shadow: 0 0 0px rgba(0,234,255,0), inset 0 0 8px rgba(121,162,255,.08);
+      transition: box-shadow .25s, border-color .25s, background .25s;
+      font-family: Orbitron, system-ui, sans-serif; letter-spacing: .5px;
+    }
+    input::placeholder { color: #7aa0bb; }
+    input:focus { outline: none; border-color: rgba(0,234,255,.7); box-shadow: 0 0 10px rgba(0,234,255,.35), inset 0 0 10px rgba(0,234,255,.08); background: #0a1428; }
+
+    .neon-btn { padding: 12px 18px; border-radius: 12px; border: 1px solid rgba(0,234,255,.6); background: linear-gradient(135deg, rgba(0,234,255,.25), rgba(0,234,255,.15)); color: #061721; font-weight: 700; cursor: pointer;
+      text-shadow: 0 0 8px rgba(0,234,255,.6);
+      box-shadow: 0 0 12px rgba(0,234,255,.4), 0 0 24px rgba(0,234,255,.16);
+      font-family: 'Press Start 2P', monospace; letter-spacing: 1px;
+      transition: transform .15s ease, box-shadow .3s ease, filter .3s ease;
+    }
+    .neon-btn:hover { transform: translateY(-1px); box-shadow: 0 0 18px rgba(0,234,255,.6), 0 0 36px rgba(0,234,255,.22); filter: brightness(1.05); }
+    .neon-btn:active { transform: translateY(0); }
+    .neon-btn:disabled { opacity: .65; cursor: not-allowed; }
+
+    .tip { font-size: 12px; color: var(--muted); margin-top: 8px; text-shadow: 0 0 6px rgba(138,43,226,.18); }
+
+    /* Flicker aleatorio (para títulos/indicadores) */
+    .flicker { animation: flicker 1.2s linear 1; }
+    @keyframes flicker {
+      0%, 19%, 21%, 23%, 64%, 100% { opacity: 1; text-shadow: 0 0 6px var(--cyan), 0 0 14px var(--cyan), 0 0 24px var(--purple); }
+      20%, 22% { opacity: .55; text-shadow: 0 0 3px var(--cyan), 0 0 8px var(--cyan), 0 0 12px var(--purple); }
+      65% { opacity: .85; }
+    }
+  </style>
+</head>
+<body>
+  <div class="bg-decor"></div>
+  <header>
+    <h1 class="neon-title flicker-target">INDUSTRIA SP // CHATBOT</h1>
+    <div class="status" id="status">Conectando…</div>
+  </header>
+  <div class="container">
+    <div class="chat">
+      <div id="messages" aria-live="polite" aria-atomic="false"></div>
+      <form id="chat-form">
+        <input id="message-input" type="text" placeholder="Escribe tu mensaje y presiona Enter…" autocomplete="off" />
+        <button id="send-btn" type="submit" class="neon-btn">Enviar</button>
+      </form>
+    </div>
+    <p class="tip">Consejo: Pregunta por "hornos", "cocinas", "alimentaria", "productos", "servicios", "cotización" o "contacto"; también "calidad", "certificaciones", "materiales", "fabricación", "automatización" y "documentación"; y por "hola", "ayuda", "hora" y "gracias".</p>
+  </div>
+
+  <script>
+    // Configuración del cliente Pusher (clave pública)
+    Pusher.logToConsole = true; // Desactívalo en producción
+    const statusEl = document.getElementById('status');
+
+    const pusher = new Pusher('1e124308c847f6b4c4ab', { cluster: 'us2' });
+    const channel = pusher.subscribe('chat');
+
+    channel.bind('pusher:subscription_succeeded', () => {
+      statusEl.textContent = 'Conectado a canal chat';
+      pulseStatus();
+    });
+
+    channel.bind('message', function (data) {
+      addMessage(data.sender || 'desconocido', data.text || '');
+    });
+
+    function addMessage(sender, text) {
+      const messages = document.getElementById('messages');
+      const wrap = document.createElement('div');
+      wrap.className = 'msg ' + (sender.toLowerCase() === 'bot' ? 'from-bot' : 'from-user');
+
+      const bubble = document.createElement('div');
+      bubble.className = 'bubble';
+      bubble.textContent = text;
+
+      const meta = document.createElement('div');
+      meta.className = 'sender';
+      meta.textContent = sender.toLowerCase() === 'bot' ? 'BOT' : 'TÚ';
+
+      wrap.appendChild(meta);
+      wrap.appendChild(bubble);
+      messages.appendChild(wrap);
+      requestAnimationFrame(() => bubble.classList.add('appear'));
+      messages.scrollTop = messages.scrollHeight;
+
+      // Pequeño glitch aleatorio en mensajes del bot (sutil)
+      if (sender.toLowerCase() === 'bot' && Math.random() < 0.08) {
+        glitchOnce(bubble);
+      }
+    }
+
+    // Envío de mensajes al backend
+    const form = document.getElementById('chat-form');
+    const input = document.getElementById('message-input');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const text = (input.value || '').trim();
+      if (!text) return;
+      input.disabled = true;
+
+      try {
+        const res = await fetch('/message', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: text, user: 'usuario' })
+        });
+        if (!res.ok) throw new Error('Error al enviar');
+        input.value = '';
+      } catch (err) {
+        console.error(err);
+        alert('No se pudo enviar el mensaje. Revisa el servidor.');
+      } finally {
+        input.disabled = false;
+        input.focus();
+      }
+    });
+
+    // Atajo: Enter envía
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        document.getElementById('send-btn').click();
+      }
+    });
+
+    // Efectos dinámicos
+    const title = document.querySelector('.flicker-target');
+    randomFlicker(title);
+
+    function randomFlicker(el) {
+      setInterval(() => {
+        if (!el) return;
+        if (Math.random() < 0.25) {
+          el.classList.add('flicker');
+          setTimeout(() => el.classList.remove('flicker'), 900);
+        }
+      }, 1800);
+    }
+
+    function pulseStatus() {
+      let on = true;
+      setInterval(() => {
+        on = !on;
+        statusEl.style.textShadow = on ? '0 0 10px rgba(0,234,255,.6)' : '0 0 4px rgba(0,234,255,.25)';
+      }, 1000);
+    }
+
+    function glitchOnce(el) {
+      const t = el.style.transform;
+      el.style.transform = 'skewX(' + (Math.random() * 2 - 1).toFixed(2) + 'deg) translateY(' + (Math.random() * 2 - 1).toFixed(2) + 'px)';
+      setTimeout(() => { el.style.transform = t; }, 180);
+    }
+  </script>
+</body>
+</html>
