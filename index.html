@@ -170,7 +170,7 @@
       input.disabled = true;
 
       try {
-        const res = await fetch('/message', {
+        const res = await fetch('https://back-cunyas.onrender.com/message', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ message: text, user: 'usuario' })
